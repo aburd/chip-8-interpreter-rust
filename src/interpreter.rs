@@ -22,6 +22,11 @@ type PCRegister = u16;
 type SPRegister = u8;
 type Stack = [u16; 16];
 
+fn init_pc_register() -> PCRegister {
+    let reg: PCRegister = 0x200;
+    reg
+}
+
 /**
  * ========
  * KEYBOARD - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.3
@@ -125,6 +130,30 @@ type Gfx = [bool; 64 * 32];
 
 type Opcode = u16;
 
+/**
+ * =======
+ * FONTSET
+ * =======
+ */
+const CHIP8_FONTSET: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // ZERO
+    0x20, 0x60, 0x20, 0x20, 0x70, // ONE
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // TWO,
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // THREE
+    0x90, 0x90, 0xF0, 0x10, 0x10, // FOUR
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // FIVE
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // SIX
+    0xF0, 0x10, 0x20, 0x40, 0x40, // SEVEN
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // EIGHT
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // NINE
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+];
+
 pub struct Chip8Interpreter {
     memory: Memory,
     v: GeneralRegisters,
@@ -141,11 +170,27 @@ impl Chip8Interpreter {
         Chip8Interpreter {
             memory,
             v: GeneralRegisters::default(),
-            pc: PCRegister::default(),
+            pc: init_pc_register(),
             stack: Stack::default(),
             sp: SPRegister::default(),
             keys: Keys::default(),
             draw_flag: false,
+        }
+    }
+
+    pub fn initialize(&mut self) {
+        // Reset all pertinent memory
+        self.memory = [0; 4096];
+        self.v = GeneralRegisters::default();
+        self.pc = init_pc_register();
+        self.stack = Stack::default();
+        self.sp = SPRegister::default();
+        self.keys = Keys::default();
+        self.draw_flag = false;
+
+        // Load fontset
+        for i in 0..80 {
+            self.memory[i] = CHIP8_FONTSET[i];
         }
     }
 }
@@ -193,4 +238,10 @@ fn test_keys_initialize_to_false() {
     for key in keys.iter() {
         assert_eq!(*key, false);
     }
+}
+
+#[test]
+fn test_initial_mem_location_is_0x200() {
+    let pc_reg = init_pc_register();
+    assert_eq!(pc_reg, 0x200);
 }
