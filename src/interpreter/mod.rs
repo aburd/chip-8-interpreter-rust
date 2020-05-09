@@ -1,6 +1,8 @@
 use std::path::Path;
 mod instructions;
 
+use instructions::Instruction;
+
 /**
  * ======
  * MEMORY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
@@ -8,6 +10,7 @@ mod instructions;
  */
 type Memory = [u8; 4096];
 const USERSPACE_START: u16 = 0x200;
+const USERSPACE_END: u16 = 0xFFF;
 
 /**
  * =========
@@ -155,29 +158,53 @@ impl Chip8Interpreter {
 impl Chip8Interpreter {
     /// Every cycle, the method emulateCycle is called which emulates one cycle of the Chip 8 CPU.
     /// During this cycle, the emulator will Fetch, Decode and Execute one opcode.
-    pub fn emulate_cycle(&mut self) {
+    pub fn emulate_cycle(&mut self) -> Result<(), String> {
         // Fetch Opcode
         let byte1 = self.memory[self.pc as usize];
-        self.pc += 1;
-        let byte2 = self.memory[self.pc as usize];
-        self.pc += 1;
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        self.pc += 2;
         let opcode: Opcode = (byte1 as Opcode) << 8 | byte2 as Opcode;
 
+        if self.pc == USERSPACE_END + 1 {
+            self.pc = USERSPACE_START;
+        }
+
         // Decode Opcode
+        let instruction = instructions::decode_opcode(opcode)?;
 
         // Execute Opcode
+        self.execute_instruction(instruction);
 
         // Update timers
 
-        unimplemented!();
+        Ok(())
+    }
+
+    fn execute_instruction(&mut self, instruction: instructions::Instruction) {
+        match instruction {
+            Instruction::Call(nnn) => println!("Call"),
+            Instruction::Clear => println!("Clear"),
+            Instruction::SubReturn => println!("SubReturn"),
+            Instruction::Jump(nnn) => println!("Jump"),
+            Instruction::CallSubroutine(nnn) => println!("CallSubroutine"),
+            Instruction::SkipEq(x, nn) => println!("SkipEq"),
+            Instruction::SkipNeq(x, nn) => println!("SkipNeq"),
+            Instruction::SkipRegEq(x, y) => println!("SkipRegEq"),
+            Instruction::Set(x, nn) => println!("Set"),
+            Instruction::AddNoCarry(x, nn) => println!("AddNoCarry"),
+            Instruction::Assign(x, y) => println!("Assign"),
+            Instruction::AssignOr(x, y) => println!("AssignOr"),
+            Instruction::AssignAnd(x, y) => println!("AssignAnd"),
+            _ => println!("Not implemented"),
+        }
     }
 
     pub fn draw_graphics(&self) {
-        unimplemented!();
+        println!("TODO: Draw graphics");
     }
 
     pub fn set_keys(&mut self) {
-        unimplemented!();
+        println!("TODO: Set keys");
     }
 }
 
