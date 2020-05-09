@@ -58,7 +58,16 @@ pub enum Instruction {
 }
 
 fn get_nnn(opcode: Opcode) -> u16 {
-    opcode & 0x0111
+    opcode & 0x0FFF
+}
+fn get_nn(opcode: Opcode) -> u8 {
+    (opcode & 0x00FF) as u8
+}
+fn get_x(opcode: Opcode) -> u8 {
+    ((opcode & 0x0F00) >> 8) as u8
+}
+fn get_y(opcode: Opcode) -> u8 {
+    ((opcode & 0x00F0) >> 4) as u8
 }
 
 pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
@@ -67,10 +76,42 @@ pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
         0x00EE => Ok(Instruction::SubReturn),
         o if o > 0x0000 && o <= 0x0FFF => Ok(Instruction::Call(get_nnn(o))),
         o if o >= 0x1000 && o < 0x2000 => Ok(Instruction::Jump(get_nnn(o))),
+        o if o >= 0x2000 && o < 0x3000 => Ok(Instruction::CallSubroutine(get_nnn(o))),
+        o if o >= 0x3000 && o < 0x4000 => {
+            Ok(Instruction::SkipEq(
+                get_x(o),
+                get_nn(o),
+            ))
+        },
+        o if o >= 0x4000 && o < 0x5000 => {
+            Ok(Instruction::SkipNeq(
+                get_x(o),
+                get_nn(o),
+            ))
+        },
+        o if o >= 0x5000 && o < 0x6000 => {
+            Ok(Instruction::SkipRegEq(
+                get_x(o),
+                get_y(o),
+            ))
+        },
+        o if o >= 0x6000 && o < 0x7000 => {
+            Ok(Instruction::Set(
+                get_x(o),
+                get_nn(o),
+            ))
+        },
         _ => Err("Opcode not implemented!".to_string()),
     }
 }
 
+#[test]
+fn test_parse_call() {
+    let opcode: Opcode = 0x0111;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::Call(0x111)));
+}
 #[test]
 fn test_parse_clear() {
     let opcode: Opcode = 0x00E0;
@@ -86,16 +127,37 @@ fn test_parse_subreturn() {
     assert_eq!(instruction, Ok(Instruction::SubReturn));
 }
 #[test]
-fn test_parse_call() {
-    let opcode: Opcode = 0x0111;
-    let instruction = decode_opcode(opcode);
-
-    assert_eq!(instruction, Ok(Instruction::Call(0x111)));
-}
-#[test]
 fn test_parse_jump() {
     let opcode: Opcode = 0x1111;
     let instruction = decode_opcode(opcode);
 
     assert_eq!(instruction, Ok(Instruction::Jump(0x111)));
+}
+#[test]
+fn test_parse_subroutine() {
+    let opcode: Opcode = 0x2111;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::CallSubroutine(0x111)));
+}
+#[test]
+fn test_parse_skip() {
+    let opcode_skip_eq: Opcode = 0x3122;
+    let instruction_skip_eq = decode_opcode(opcode_skip_eq);
+    assert_eq!(instruction_skip_eq, Ok(Instruction::SkipEq(0x1, 0x22)));
+
+    let opcode_skip_neq: Opcode = 0x4122;
+    let instruction_skip_neq = decode_opcode(opcode_skip_neq);
+    assert_eq!(instruction_skip_neq, Ok(Instruction::SkipNeq(0x1, 0x22)));
+    
+    let opcode_skip_eq: Opcode = 0x5120;
+    let instruction_skip_eq = decode_opcode(opcode_skip_eq);
+    assert_eq!(instruction_skip_eq, Ok(Instruction::SkipRegEq(0x1, 0x2)));
+}
+#[test]
+fn test_parse_set() {
+    let opcode: Opcode = 0x6A12;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::Set(0xA, 0x12)));
 }
