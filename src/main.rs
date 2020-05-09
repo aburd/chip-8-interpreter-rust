@@ -1,12 +1,22 @@
+use std::path::Path;
+use std::error::Error;
 mod interpreter;
 
 use interpreter::Chip8Interpreter;
 
-fn main() {
+type BoxResult<T> = Result<T, Box<dyn Error>>;
+
+fn main() -> BoxResult<()> {
+    // CLI
+    let args: Vec<_> = std::env::args().collect();
+    let path_str = args.get(1).expect("A path to the rom is needed!");
+
     // Set up render system and register input callbacks
 
     // Initialize the Chip8 system and load the game into the memory
     let mut chip8_interpreter = Chip8Interpreter::new();
+    let rom_path = Path::new(path_str);
+    chip8_interpreter.load_rom(rom_path)?;
 
     // Emulation loop
     loop {
