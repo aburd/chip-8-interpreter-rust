@@ -162,9 +162,16 @@ impl Chip8Interpreter {
         // Fetch Opcode
         let byte1 = self.memory[self.pc as usize];
         let byte2 = self.memory[(self.pc + 1) as usize];
-        self.pc += 2;
         let opcode: Opcode = (byte1 as Opcode) << 8 | byte2 as Opcode;
 
+        // Wrap if loaded Rom gets to empty memory
+        if opcode == 0x0 {
+            self.pc = USERSPACE_START;
+            return Ok(());
+        }
+
+        // Increment Program Counter Register and wrap if it reaches the end of memory
+        self.pc += 2;
         if self.pc == USERSPACE_END + 1 {
             self.pc = USERSPACE_START;
         }
@@ -182,29 +189,28 @@ impl Chip8Interpreter {
 
     fn execute_instruction(&mut self, instruction: instructions::Instruction) {
         match instruction {
-            Instruction::Call(nnn) => println!("Call"),
-            Instruction::Clear => println!("Clear"),
+            Instruction::Call(nnn) => println!("Call, nnn: {:X}", nnn),
+            Instruction::Clear => println!("Clear screen"),
             Instruction::SubReturn => println!("SubReturn"),
-            Instruction::Jump(nnn) => println!("Jump"),
-            Instruction::CallSubroutine(nnn) => println!("CallSubroutine"),
-            Instruction::SkipEq(x, nn) => println!("SkipEq"),
-            Instruction::SkipNeq(x, nn) => println!("SkipNeq"),
-            Instruction::SkipRegEq(x, y) => println!("SkipRegEq"),
-            Instruction::Set(x, nn) => println!("Set"),
-            Instruction::AddNoCarry(x, nn) => println!("AddNoCarry"),
-            Instruction::Assign(x, y) => println!("Assign"),
-            Instruction::AssignOr(x, y) => println!("AssignOr"),
-            Instruction::AssignAnd(x, y) => println!("AssignAnd"),
-            _ => println!("Not implemented"),
+            Instruction::Jump(nnn) => println!("Jump, nnn: {:X}", nnn),
+            Instruction::CallSubroutine(nnn) => println!("CallSubroutine, nnn: {:X}", nnn),
+            Instruction::SkipEq(x, nn) => println!("SkipEq, x: {:X}, nn: {:X}", x, nn),
+            Instruction::SkipNeq(x, nn) => println!("SkipNeq, x: {:X}, nn: {:X}", x, nn),
+            Instruction::SkipRegEq(x, y) => println!("SkipRegEq, x: {:X}, y: {:X}", x, y),
+            Instruction::Set(x, nn) => println!("Set, x: {:X}, nn: {:X}", x, nn),
+            Instruction::AddNoCarry(x, nn) => println!("AddNoCarry, x: {:X}, nn: {:X}", x, nn),
+            Instruction::Assign(x, y) => println!("Assign, x: {:X}, y: {:X}", x, y),
+            Instruction::AssignOr(x, y) => println!("AssignOr, x: {:X}, y: {:X}", x, y),
+            Instruction::AssignAnd(x, y) => println!("AssignAnd, x: {:X}, y: {:X}", x, y),
         }
     }
 
     pub fn draw_graphics(&self) {
-        println!("TODO: Draw graphics");
+        // println!("TODO: Draw graphics");
     }
 
     pub fn set_keys(&mut self) {
-        println!("TODO: Set keys");
+        // println!("TODO: Set keys");
     }
 }
 

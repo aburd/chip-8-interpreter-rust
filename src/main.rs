@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::error::Error;
+use std::path::Path;
 mod interpreter;
 
 use interpreter::Chip8Interpreter;
@@ -21,7 +21,10 @@ fn main() -> BoxResult<()> {
     // Emulation loop
     loop {
         // Emulate one cycle
-        chip8_interpreter.emulate_cycle();
+        match chip8_interpreter.emulate_cycle() {
+            Ok(_) => (),
+            Err(e) => println!("{}", e),
+        };
 
         // If the draw flag is set, update the screen
         if chip8_interpreter.draw_flag {
