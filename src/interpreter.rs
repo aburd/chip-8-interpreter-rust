@@ -1,9 +1,12 @@
+use std::path::Path;
+
 /**
  * ======
  * MEMORY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
  * ======
  */
 type Memory = [u8; 4096];
+const USERSPACE_START: u16 = 0x200;
 
 /**
  * =========
@@ -23,8 +26,7 @@ type SPRegister = u8;
 type Stack = [u16; 16];
 
 fn init_pc_register() -> PCRegister {
-    let reg: PCRegister = 0x200;
-    reg
+    USERSPACE_START.clone()
 }
 
 /**
@@ -192,6 +194,23 @@ impl Chip8Interpreter {
         for i in 0..80 {
             self.memory[i] = CHIP8_FONTSET[i];
         }
+
+        // Reset timers
+    }
+
+    pub fn load_rom(&mut self, path: &Path) -> std::io::Result<()> {
+        let file = std::fs::read(path)?;
+        for (i, byte) in file.iter().enumerate() {
+            self.memory[(USERSPACE_START + i as u16) as usize] = *byte;
+        }
+        Ok(())
+    }
+
+    pub fn get_memory(&self, idx: usize) -> u8 {
+        let mem_slice: Vec<u8> = self.memory[..].iter()
+            .map(|val| val.clone())
+            .collect();
+        mem_slice.get(idx).unwrap().clone()
     }
 }
 
@@ -244,4 +263,24 @@ fn test_keys_initialize_to_false() {
 fn test_initial_mem_location_is_0x200() {
     let pc_reg = init_pc_register();
     assert_eq!(pc_reg, 0x200);
+}
+
+#[test]
+fn test_opens_rom_correctly() -> std::io::Result<()> {
+    let mut interpreter = Chip8Interpreter::new();
+    let path = Path::new("roms/puzzle.ch8");
+    interpreter.load_rom(path)?;
+
+    let first_byte = interpreter.get_memory(USERSPACE_START as usize);
+    assert_eq!(first_byte, 0x00);
+    let second_byte = interpreter.get_memory((USERSPACE_START + 1) as usize);
+    assert_eq!(second_byte, 0xE0);
+    let third_byte = interpreter.get_memory((USERSPACE_START + 2) as usize);
+    assert_eq!(third_byte, 0x6C);
+    let fourth_byte = interpreter.get_memory((USERSPACE_START + 3) as usize);
+    assert_eq!(fourth_byte, 0x00);
+    let third_byte = interpreter.get_memory((USERSPACE_START + 4) as usize);
+    assert_eq!(third_byte, 0x4C);
+
+    Ok(())
 }
