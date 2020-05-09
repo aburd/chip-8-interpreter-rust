@@ -72,12 +72,10 @@ fn get_y(opcode: Opcode) -> u8 {
 
 pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
     match opcode {
-        o if o >= 0x0000 && o < 0x1000 => {
-            match o {
-                0x00E0 => Ok(Instruction::Clear),
-                0x00EE => Ok(Instruction::SubReturn),
-                _ => Ok(Instruction::Call(get_nnn(o))),
-            }
+        o if o >= 0x0000 && o < 0x1000 => match o {
+            0x00E0 => Ok(Instruction::Clear),
+            0x00EE => Ok(Instruction::SubReturn),
+            _ => Ok(Instruction::Call(get_nnn(o))),
         },
         o if o >= 0x1000 && o < 0x2000 => Ok(Instruction::Jump(get_nnn(o))),
         o if o >= 0x2000 && o < 0x3000 => Ok(Instruction::CallSubroutine(get_nnn(o))),
@@ -94,7 +92,7 @@ pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
                 0x2 => Ok(Instruction::AssignAnd(get_x(o), get_y(o))),
                 _ => Err("Opcode not implemented!".to_string()),
             }
-        },
+        }
         _ => Err("Opcode not implemented!".to_string()),
     }
 }
