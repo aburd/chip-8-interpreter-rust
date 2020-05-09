@@ -4,7 +4,7 @@ use super::Opcode;
 pub enum Instruction {
     // Standard Instructions
     Call(u16), //  0NNN 	Call 		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-    Clear,   //  00E0 	Display 	disp_clear() 	Clears the screen.
+    Clear,     //  00E0 	Display 	disp_clear() 	Clears the screen.
     SubReturn, //  00EE 	Flow 	    return; 	Returns from a subroutine.
     Jump(u16), //  1NNN 	Flow 	    goto NNN; 	Jumps to address NNN.
     CallSubroutine(u16), //  2NNN 	Flow 	    *(0xNNN)() 	Calls subroutine at NNN.
@@ -14,8 +14,8 @@ pub enum Instruction {
     Set(u8, u8),       //  6XNN 	Const 	    Vx = NN 	Sets VX to NN.
     AddNoCarry(u8, u8), //  7XNN 	Const 	    Vx += NN 	Adds NN to VX. (Carry flag is not changed)
     Assign(u8, u8),    //  8XY0 	Assign 	    Vx=Vy 	Sets VX to the value of VY.
-                       //  8XY1 	BitOp 	    Vx=Vx|Vy 	Sets VX to VX or VY. (Bitwise OR operation)
-                       //  8XY2 	BitOp 	    Vx=Vx&Vy 	Sets VX to VX and VY. (Bitwise AND operation)
+    AssignOr(u8, u8),  //  8XY1 	BitOp 	    Vx=Vx|Vy 	Sets VX to VX or VY. (Bitwise OR operation)
+    AssignAnd(u8, u8), //  8XY2 	BitOp 	    Vx=Vx&Vy 	Sets VX to VX and VY. (Bitwise AND operation)
                        //  8XY3[a]  BitOp 	    Vx=Vx^Vy 	Sets VX to VX xor VY.
                        //  8XY4 	Math 	    Vx += Vy 	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
                        //  8XY5 	Math 	    Vx -= Vy 	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
@@ -72,34 +72,28 @@ fn get_y(opcode: Opcode) -> u8 {
 
 pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
     match opcode {
-        0x00E0 => Ok(Instruction::Clear),
-        0x00EE => Ok(Instruction::SubReturn),
-        o if o > 0x0000 && o <= 0x0FFF => Ok(Instruction::Call(get_nnn(o))),
+        o if o >= 0x0000 && o < 0x1000 => {
+            match o {
+                0x00E0 => Ok(Instruction::Clear),
+                0x00EE => Ok(Instruction::SubReturn),
+                _ => Ok(Instruction::Call(get_nnn(o))),
+            }
+        },
         o if o >= 0x1000 && o < 0x2000 => Ok(Instruction::Jump(get_nnn(o))),
         o if o >= 0x2000 && o < 0x3000 => Ok(Instruction::CallSubroutine(get_nnn(o))),
-        o if o >= 0x3000 && o < 0x4000 => {
-            Ok(Instruction::SkipEq(
-                get_x(o),
-                get_nn(o),
-            ))
-        },
-        o if o >= 0x4000 && o < 0x5000 => {
-            Ok(Instruction::SkipNeq(
-                get_x(o),
-                get_nn(o),
-            ))
-        },
-        o if o >= 0x5000 && o < 0x6000 => {
-            Ok(Instruction::SkipRegEq(
-                get_x(o),
-                get_y(o),
-            ))
-        },
-        o if o >= 0x6000 && o < 0x7000 => {
-            Ok(Instruction::Set(
-                get_x(o),
-                get_nn(o),
-            ))
+        o if o >= 0x3000 && o < 0x4000 => Ok(Instruction::SkipEq(get_x(o), get_nn(o))),
+        o if o >= 0x4000 && o < 0x5000 => Ok(Instruction::SkipNeq(get_x(o), get_nn(o))),
+        o if o >= 0x5000 && o < 0x6000 => Ok(Instruction::SkipRegEq(get_x(o), get_y(o))),
+        o if o >= 0x6000 && o < 0x7000 => Ok(Instruction::Set(get_x(o), get_nn(o))),
+        o if o >= 0x7000 && o < 0x8000 => Ok(Instruction::AddNoCarry(get_x(o), get_nn(o))),
+        o if o >= 0x8000 && o <= 0x9000 => {
+            let trailing_byte = o & 0x000F;
+            match trailing_byte {
+                0x0 => Ok(Instruction::Assign(get_x(o), get_y(o))),
+                0x1 => Ok(Instruction::AssignOr(get_x(o), get_y(o))),
+                0x2 => Ok(Instruction::AssignAnd(get_x(o), get_y(o))),
+                _ => Err("Opcode not implemented!".to_string()),
+            }
         },
         _ => Err("Opcode not implemented!".to_string()),
     }
@@ -149,7 +143,7 @@ fn test_parse_skip() {
     let opcode_skip_neq: Opcode = 0x4122;
     let instruction_skip_neq = decode_opcode(opcode_skip_neq);
     assert_eq!(instruction_skip_neq, Ok(Instruction::SkipNeq(0x1, 0x22)));
-    
+
     let opcode_skip_eq: Opcode = 0x5120;
     let instruction_skip_eq = decode_opcode(opcode_skip_eq);
     assert_eq!(instruction_skip_eq, Ok(Instruction::SkipRegEq(0x1, 0x2)));
@@ -160,4 +154,32 @@ fn test_parse_set() {
     let instruction = decode_opcode(opcode);
 
     assert_eq!(instruction, Ok(Instruction::Set(0xA, 0x12)));
+}
+#[test]
+fn test_parse_add_no_carry() {
+    let opcode: Opcode = 0x7A12;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::AddNoCarry(0xA, 0x12)));
+}
+#[test]
+fn test_parse_assign() {
+    let opcode: Opcode = 0x8AB0;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::Assign(0xA, 0xB)));
+}
+#[test]
+fn test_parse_assign_or() {
+    let opcode: Opcode = 0x8AB1;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::AssignOr(0xA, 0xB)));
+}
+#[test]
+fn test_parse_assign_and() {
+    let opcode: Opcode = 0x8AB2;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::AssignAnd(0xA, 0xB)));
 }
