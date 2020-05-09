@@ -206,11 +206,11 @@ impl Chip8Interpreter {
     }
 
     pub fn draw_graphics(&self) {
-        // println!("TODO: Draw graphics");
+        println!("TODO: Draw graphics");
     }
 
     pub fn set_keys(&mut self) {
-        // println!("TODO: Set keys");
+        println!("TODO: Set keys");
     }
 }
 
