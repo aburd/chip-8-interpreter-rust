@@ -1,5 +1,7 @@
 mod interpreter;
 
+use interpreter::Chip8Interpreter;
+
 fn main() {
-    let chip_8 = interpreter::Chip8::new();
+    let chip8_interpreter = Chip8Interpreter::new();
 }

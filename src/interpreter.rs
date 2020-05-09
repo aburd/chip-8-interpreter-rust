@@ -119,7 +119,7 @@ type Gfx = [bool; 64 * 32];
 
 type Opcode = u16;
 
-pub struct Chip8 {
+pub struct Chip8Interpreter {
     memory: Memory,
     v: GeneralRegisters,
     pc: PCRegister,
@@ -127,10 +127,10 @@ pub struct Chip8 {
     sp: SPRegister,
 }
 
-impl Chip8 {
+impl Chip8Interpreter {
     pub fn new() -> Self {
         let memory: Memory = [0; 4096];
-        Chip8 {
+        Chip8Interpreter {
             memory,
             v: GeneralRegisters::default(),
             pc: PCRegister::default(),
@@ -139,6 +139,7 @@ impl Chip8 {
         }
     }
 }
+
 
 #[test]
 fn test_registers_initialize_to_zero() {
