@@ -34,6 +34,8 @@ type Stack = [u16; 16];
  * A 0 B F
  */
 
+type Keys = [bool; 4 * 4];
+
 /**
 * =======
 * DISPLAY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4
@@ -125,6 +127,8 @@ pub struct Chip8Interpreter {
     pc: PCRegister,
     stack: Stack,
     sp: SPRegister,
+    keys: Keys,
+    pub draw_flag: bool,
 }
 
 impl Chip8Interpreter {
@@ -136,7 +140,23 @@ impl Chip8Interpreter {
             pc: PCRegister::default(),
             stack: Stack::default(),
             sp: SPRegister::default(),
+            keys: Keys::default(),
+            draw_flag: false,
         }
+    }
+}
+
+impl Chip8Interpreter {
+    pub fn emulate_cycle(&mut self) {
+        unimplemented!();
+    }
+
+    pub fn draw_graphics(&self) {
+        unimplemented!();
+    }
+
+    pub fn set_keys(&mut self) {
+        unimplemented!();
     }
 }
 
@@ -146,5 +166,13 @@ fn test_registers_initialize_to_zero() {
     let regs = GeneralRegisters::default();
     for reg in regs.iter() {
         assert_eq!(*reg, 0);
+    }
+}
+
+#[test]
+fn test_keys_initialize_to_false() {
+    let keys = Keys::default();
+    for key in keys.iter() {
+        assert_eq!(*key, false);
     }
 }
