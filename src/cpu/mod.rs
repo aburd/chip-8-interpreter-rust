@@ -1,22 +1,17 @@
+use rand::Rng;
 use std::path::Path;
 mod instructions;
 
 use instructions::Instruction;
 
 /// MEMORY: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
-type Memory = [u8; 4096];
 pub type Opcode = u16;
 const OPCODE_SIZE: u16 = 2;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
 
 /// REGISTERS - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.2
-const VF: usize = 15;
-type GeneralRegisters = [u8; 16];
-type PCRegister = u16; // Program Counter Register
-type SPRegister = u8; // Stack Pointer Register
-type I = u16;
-type Stack = [u16; 16];
+const VF: usize = 0x0F;
 
 enum ProgramCounterChange {
     Next,
@@ -34,7 +29,7 @@ impl ProgramCounterChange {
     }
 }
 
-fn init_pc_register() -> PCRegister {
+fn init_pc_register() -> u16 {
     USERSPACE_START.clone()
 }
 
@@ -59,7 +54,9 @@ type Keys = [bool; 4 * 4];
 * The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
 * This can easily be implemented using an array that hold the pixel state (1 or 0):
 */
-type Gfx = [bool; 64 * 32];
+const SCREEN_WIDTH: usize = 64;
+const SCREEN_HEIGHT: usize = 32;
+type Gfx = [bool; SCREEN_WIDTH * SCREEN_HEIGHT];
 
 /// SOUND - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.5
 /**
@@ -90,11 +87,12 @@ const CHIP8_FONTSET: [u8; 80] = [
 ];
 
 pub struct Cpu {
-    memory: Memory,
-    v: GeneralRegisters,
-    pc: PCRegister,
-    stack: Stack,
-    sp: SPRegister,
+    memory: [u8; 4096],
+    v: [u8; 16],
+    pc: u16,
+    stack: [u16; 16],
+    sp: u8,
+    i: I,
     pixels: Gfx,
     keys: Keys,
     sound_timer: u8,
@@ -104,15 +102,14 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new() -> Self {
-        let memory: Memory = [0; 4096];
-        let pixels: Gfx = [false; 64 * 32];
         Cpu {
-            memory,
-            v: GeneralRegisters::default(),
+            memory: [0; 4096],
+            v: [0; 16],
             pc: init_pc_register(),
-            stack: Stack::default(),
-            sp: SPRegister::default(),
-            pixels,
+            stack: [0; 16],
+            sp: 0x00,
+            i: u16,
+            pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             keys: Keys::default(),
             sound_timer: 0,
             delay_timer: 0,
@@ -123,12 +120,16 @@ impl Cpu {
     pub fn initialize(&mut self) {
         // Reset all pertinent memory
         self.memory = [0; 4096];
-        self.v = GeneralRegisters::default();
+        self.v = [0; 16];
         self.pc = init_pc_register();
-        self.stack = Stack::default();
-        self.sp = SPRegister::default();
+        self.stack = [0; 16];
+        self.sp = 0x00;
+        i: 0x0000,
         self.keys = Keys::default();
         self.draw_flag = false;
+
+        // Reset screen
+        self.execute(Instruction::Clear);
 
         // Load fontset
         for i in 0..80 {
@@ -199,83 +200,95 @@ impl Cpu {
             }
             Instruction::Jump(nnn) => ProgramCounterChange::Jump(nnn),
             Instruction::CallSubroutine(nnn) => {
-                println!("CallSubroutine, nnn: {:X}", nnn);
-                ProgramCounterChange::Next
+                // *(0xNNN)() 	Calls subroutine at NNN.
+                self.stack[self.sp as usize] = self.pc + OPCODE_SIZE;
+                self.sp += 1;
+                ProgramCounterChange::Jump(nnn)
             }
-            Instruction::SkipEq(x, nn) => {
-                println!("SkipEq, x: {:X}, nn: {:X}", x, nn);
-                ProgramCounterChange::Next
-            }
-            Instruction::SkipNeq(x, nn) => {
-                println!("SkipNeq, x: {:X}, nn: {:X}", x, nn);
-                ProgramCounterChange::Next
-            }
-            Instruction::SkipRegEq(x, y) => {
-                println!("SkipRegEq, x: {:X}, y: {:X}", x, y);
-                ProgramCounterChange::Next
-            }
+            Instruction::SkipEq(x, nn) => ProgramCounterChange::skip_if(self.v[x] == nn),
+            Instruction::SkipNeq(x, nn) => ProgramCounterChange::skip_if(self.v[x] != nn),
+            Instruction::SkipRegEq(x, y) => ProgramCounterChange::skip_if(self.v[x] == self.v[y]),
             Instruction::Set(x, nn) => {
-                println!("Set, x: {:X}, nn: {:X}", x, nn);
+                self.v[x] = nn;
                 ProgramCounterChange::Next
             }
             Instruction::AddNoCarry(x, nn) => {
-                println!("AddNoCarry, x: {:X}, nn: {:X}", x, nn);
+                let vx_val = self.v[x] as u16;
+                let res = vx_val + nn as u16;
+                self.v[x] = res as u8;
                 ProgramCounterChange::Next
             }
             Instruction::Assign(x, y) => {
-                println!("Assign, x: {:X}, y: {:X}", x, y);
+                self.v[x] = self.v[y];
                 ProgramCounterChange::Next
             }
             Instruction::AssignOr(x, y) => {
-                println!("AssignOr, x: {:X}, y: {:X}", x, y);
+                self.v[x] = self.v[x] | self.v[y];
                 ProgramCounterChange::Next
             }
             Instruction::AssignAnd(x, y) => {
-                println!("AssignAnd, x: {:X}, y: {:X}", x, y);
+                self.v[x] = self.v[x] & self.v[y];
                 ProgramCounterChange::Next
             }
             Instruction::AssignXor(x, y) => {
-                println!("AssignXor, x: {:X}, y: {:X}", x, y);
+                self.v[x] = self.v[x] ^ self.v[y];
                 ProgramCounterChange::Next
             }
             Instruction::AddCarry(x, y) => {
-                println!("AddCarry, x: {:X}, y: {:X}", x, y);
+                let vx_val = self.v[x] as u16;
+                let vy_val = self.v[y] as u16;
+                let res = vx_val + vy_val;
+                self.v[x] = res as u8;
+                self.v[VF] = if res > 0xFF { 1 } else { 0 };
                 ProgramCounterChange::Next
             }
             Instruction::SubLeft(x, y) => {
-                println!("SubLeft, x: {:X}, y: {:X}", x, y);
+                self.v[VF] = if self.v[y] > self.v[x] { 1 } else { 0 };
+                self.v[x] = self.v[x].wrapping_sub(self.v[y]);
                 ProgramCounterChange::Next
             }
             Instruction::LeastSig(x) => {
-                println!("LeastSig, x: {:X}", x);
+                self.v[VF] = self.v[x] & 0x0F;
+                self.v[x] >>= 1;
                 ProgramCounterChange::Next
             }
             Instruction::SubRight(x, y) => {
-                println!("SubRight, x: {:X}, y: {:X}", x, y);
+                self.v[VF] = if self.v[x] > self.v[y] { 0 } else { 1 };
+                self.v[x] = self.v[y].wrapping_sub(self.v[x]);
                 ProgramCounterChange::Next
             }
             Instruction::MostSig(x) => {
-                println!("MostSig, x: {:X}", x);
+                self.v[VF] = (self.v[x] & 0xF0) >> 4;
+                self.v[x] <<= 1;
                 ProgramCounterChange::Next
             }
-            Instruction::CondNeq(x, y) => {
-                println!("CondNeq, x: {:X}, y: {:X}", x, y);
-                ProgramCounterChange::Next
-            }
+            Instruction::CondNeq(x, y) => ProgramCounterChange::skip_if(self.v[x] != self.v[y]),
             Instruction::SetI(nnn) => {
-                println!("SetI, nnn: {:X}", nnn);
+                self.i = nnn;
                 ProgramCounterChange::Next
             }
             Instruction::JumpV0NNN(nnn) => {
-                println!("JumpV0NNN, nnn: {:X}", nnn);
+                self.pc = self.v[0] as u16 + nnn;
                 ProgramCounterChange::Next
             }
-            Instruction::RandX(x, y) => {
-                println!("RandX, x: {:X}, y: {:X}", x, y);
+            Instruction::RandX(x, nn) => {
+                let mut rng = rand::thread_rng();
+                let random_u8: u8 = rng.gen();
+                self.v[x] = random_u8 & nn;
                 ProgramCounterChange::Next
             }
             Instruction::DrawSprite(x, y, n) => {
-                println!("DrawSprite, x: {:X}, y: {:X}, n: {:X}", x, y, n);
+                // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+                // The interpreter reads n bytes from memory, starting at the address stored in I. 
+                // These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). 
+                // Sprites are XORed onto the existing screen. 
+                // If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. 
+                // If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen. 
+                // See instruction 8xy3 for more information on XOR, and section 2.4, Display, for more information on the Chip-8 screen and sprites.
+                for i in 0..n {
+                    let pixel = self.memory[self.i + i];
+                    self.pixels[(self.v[x] * SCREEN_WIDTH + self.v[y] + i)] = pixel;
+                }
                 ProgramCounterChange::Next
             }
             Instruction::KeyPressed(x) => {
@@ -337,14 +350,6 @@ impl Cpu {
 
     pub fn set_keys(&mut self) {
         println!("TODO: Set keys");
-    }
-}
-
-#[test]
-fn test_registers_initialize_to_zero() {
-    let regs = GeneralRegisters::default();
-    for reg in regs.iter() {
-        assert_eq!(*reg, 0);
     }
 }
 
