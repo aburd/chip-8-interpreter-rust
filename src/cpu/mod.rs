@@ -4,14 +4,10 @@ mod instructions;
 
 use instructions::Instruction;
 
-/// MEMORY: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
 pub type Opcode = u16;
 const OPCODE_SIZE: u16 = 2;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
-
-/// REGISTERS - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.2
-const VF: usize = 0x0F;
 
 enum ProgramCounterChange {
     Next,
@@ -194,13 +190,13 @@ impl Cpu {
             }
             Instruction::SubReturn => {
                 // The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
-                self.pc = self.stack[self.sp as usize];
                 self.sp -= 1;
-                ProgramCounterChange::Next
+                ProgramCounterChange::Jump(self.stack[self.sp as usize])
             }
             Instruction::Jump(nnn) => ProgramCounterChange::Jump(nnn),
             Instruction::CallSubroutine(nnn) => {
-                // *(0xNNN)() 	Calls subroutine at NNN.
+                // The interpreter increments the stack pointer, 
+                // then puts the current PC on the top of the stack. The PC is then set to nnn.
                 self.stack[self.sp as usize] = self.pc + OPCODE_SIZE;
                 self.sp += 1;
                 ProgramCounterChange::Jump(nnn)
@@ -239,26 +235,26 @@ impl Cpu {
                 let vy_val = self.v[y] as u16;
                 let res = vx_val + vy_val;
                 self.v[x] = res as u8;
-                self.v[VF] = if res > 0xFF { 1 } else { 0 };
+                self.v[0x0F] = if res > 0xFF { 1 } else { 0 };
                 ProgramCounterChange::Next
             }
             Instruction::SubLeft(x, y) => {
-                self.v[VF] = if self.v[y] > self.v[x] { 1 } else { 0 };
+                self.v[0x0F] = if self.v[y] > self.v[x] { 1 } else { 0 };
                 self.v[x] = self.v[x].wrapping_sub(self.v[y]);
                 ProgramCounterChange::Next
             }
             Instruction::LeastSig(x) => {
-                self.v[VF] = self.v[x] & 0x0F;
+                self.v[0x0F] = self.v[x] & 0x0F;
                 self.v[x] >>= 1;
                 ProgramCounterChange::Next
             }
             Instruction::SubRight(x, y) => {
-                self.v[VF] = if self.v[x] > self.v[y] { 0 } else { 1 };
+                self.v[0x0F] = if self.v[x] > self.v[y] { 0 } else { 1 };
                 self.v[x] = self.v[y].wrapping_sub(self.v[x]);
                 ProgramCounterChange::Next
             }
             Instruction::MostSig(x) => {
-                self.v[VF] = (self.v[x] & 0xF0) >> 4;
+                self.v[0x0F] = (self.v[x] & 0xF0) >> 4;
                 self.v[x] <<= 1;
                 ProgramCounterChange::Next
             }
@@ -278,18 +274,29 @@ impl Cpu {
                 ProgramCounterChange::Next
             }
             Instruction::DrawSprite(x, y, n) => {
-                // Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+                // Display n-byte sprite starting at memory location I at (Vx, Vy), set 0x0F = collision.
                 // The interpreter reads n bytes from memory, starting at the address stored in I. 
                 // These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). 
                 // Sprites are XORed onto the existing screen. 
-                // If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. 
+                // If this causes any pixels to be erased, 0x0F is set to 1, otherwise it is set to 0. 
                 // If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen. 
-                // See instruction 8xy3 for more information on XOR, and section 2.4, Display, for more information on the Chip-8 screen and sprites.
+                let mut erased_flag = false;
                 for i in 0..(n as usize) {
-                    let pixel = self.memory[self.i as usize + i];
-                    let pixel_start = (self.v[x] as usize * SCREEN_WIDTH) + self.v[y] as usize;
-                    self.pixels[pixel_start + i] = pixel != 0;
+                    let x = self.v[x] as usize % SCREEN_WIDTH;
+                    let y = self.v[y] as usize % SCREEN_HEIGHT;
+
+                    println!("x: {}, y: {}", x, y );
+
+                    let pixel = self.memory[self.i as usize + i] != 0;
+                    let prev_pixel = self.pixels[y * SCREEN_WIDTH + x];
+                    let new_pixel = pixel ^ prev_pixel;
+                    self.pixels[y * SCREEN_WIDTH + x] = new_pixel;
+
+                    if prev_pixel == true && new_pixel == false {
+                        erased_flag = true;
+                    }
                 }
+                self.v[0x0F] = if erased_flag { 1 } else { 0 };
                 ProgramCounterChange::Next
             }
             Instruction::KeyPressed(x) => {
@@ -301,7 +308,7 @@ impl Cpu {
                 ProgramCounterChange::Next
             }
             Instruction::SetXDelayTimer(x) => {
-                println!("SetXDelayTimer, x: {:X}", x);
+                self.v[x] = self.delay_timer;
                 ProgramCounterChange::Next
             }
             Instruction::AwaitKeyPress(x) => {
@@ -309,15 +316,19 @@ impl Cpu {
                 ProgramCounterChange::Next
             }
             Instruction::SetDelayTimer(x) => {
-                println!("SetDelayTimer, x: {:X}", x);
+                self.delay_timer = self.v[x];
                 ProgramCounterChange::Next
             }
             Instruction::SetSoundTimer(x) => {
-                println!("SetSoundTimer, x: {:X}", x);
+                self.sound_timer = self.v[x];
                 ProgramCounterChange::Next
             }
             Instruction::AddVxToI(x) => {
-                println!("AddVxToI, x: {:X}", x);
+                let vx_val = self.v[x] as usize;
+                let i_val = self.i as usize;
+                let res = vx_val + i_val;
+                self.v[0x0F] = if res > 0x0FFF { 1 } else { 0 };
+                self.i = res as u16;
                 ProgramCounterChange::Next
             }
             Instruction::SetIWithChar(x) => {
