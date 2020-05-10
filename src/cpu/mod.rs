@@ -4,7 +4,6 @@ mod instructions;
 
 use instructions::Instruction;
 
-pub type Opcode = u16;
 const OPCODE_SIZE: u16 = 2;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
@@ -155,28 +154,20 @@ impl Cpu {
     /// Every cycle, the method emulateCycle is called which emulates one cycle of the Chip 8 CPU.
     /// During this cycle, the emulator will Fetch, Decode and Execute one opcode.
     pub fn emulate_cycle(&mut self) -> Result<(), String> {
-        // Fetch Opcode
-        let byte1 = self.memory[self.pc as usize];
-        let byte2 = self.memory[(self.pc + 1) as usize];
-        let opcode: Opcode = (byte1 as Opcode) << 8 | byte2 as Opcode;
+        let opcode = self.fetch_opcode();
 
-        // Wrap if loaded Rom gets to empty memory
-        if opcode == 0x0 {
-            self.pc = USERSPACE_START;
-            return Ok(());
-        }
-
-        // Increment Program Counter Register and wrap if it reaches the end of memory
-        self.pc += 2;
-        if self.pc == USERSPACE_END + 1 {
-            self.pc = USERSPACE_START;
-        }
         let instruction = instructions::decode_opcode(opcode)?;
         self.execute(instruction);
 
         // Update timers
 
         Ok(())
+    }
+
+    fn fetch_opcode(&self) -> u16 {
+        let byte1 = self.memory[self.pc as usize];
+        let byte2 = self.memory[(self.pc + 1) as usize];
+        (byte1 as u16) << 8 | byte2 as u16
     }
 
     fn execute(&mut self, instruction: instructions::Instruction) {

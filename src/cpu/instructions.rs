@@ -1,5 +1,3 @@
-use super::Opcode;
-
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
     // Standard Instructions
@@ -57,7 +55,8 @@ pub enum Instruction {
                  // * - Fx85 - LD Vx, R
 }
 
-pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
+pub fn decode_opcode(opcode: u16) -> Result<Instruction, String> {
+    println!("OPCODE: 0x{:X}", opcode);
     let nibbles = (
         ((opcode & 0xF000) >> 12) as u8,
         ((opcode & 0x0F00) >> 8) as u8,
