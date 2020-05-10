@@ -9,6 +9,7 @@ use instructions::Instruction;
  * ======
  */
 type Memory = [u8; 4096];
+pub type Opcode = u16;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
 
@@ -23,10 +24,9 @@ const VF: usize = 15;
 // const DELAY_TIMER_REGISTER
 // const SOUND_TIMER_REGISTER
 type GeneralRegisters = [u8; 16];
-// Program Counter Register
-type PCRegister = u16;
-// Stack Pointer Register
-type SPRegister = u8;
+type PCRegister = u16; // Program Counter Register
+type SPRegister = u8; // Stack Pointer Register
+type I = u16;
 type Stack = [u16; 16];
 
 fn init_pc_register() -> PCRegister {
@@ -73,7 +73,6 @@ type Gfx = [bool; 64 * 32];
    (0,31)	(63,31)
 */
 
-pub type Opcode = u16;
 
 /**
  * =======
@@ -99,7 +98,7 @@ const CHIP8_FONTSET: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 ];
 
-pub struct Chip8Interpreter {
+pub struct Cpu {
     memory: Memory,
     v: GeneralRegisters,
     pc: PCRegister,
@@ -109,10 +108,10 @@ pub struct Chip8Interpreter {
     pub draw_flag: bool,
 }
 
-impl Chip8Interpreter {
+impl Cpu {
     pub fn new() -> Self {
         let memory: Memory = [0; 4096];
-        Chip8Interpreter {
+        Cpu {
             memory,
             v: GeneralRegisters::default(),
             pc: init_pc_register(),
@@ -155,7 +154,7 @@ impl Chip8Interpreter {
     }
 }
 
-impl Chip8Interpreter {
+impl Cpu {
     /// Every cycle, the method emulateCycle is called which emulates one cycle of the Chip 8 CPU.
     /// During this cycle, the emulator will Fetch, Decode and Execute one opcode.
     pub fn emulate_cycle(&mut self) -> Result<(), String> {
@@ -238,7 +237,7 @@ fn test_initial_mem_location_is_0x200() {
 
 #[test]
 fn test_opens_rom_correctly() -> std::io::Result<()> {
-    let mut interpreter = Chip8Interpreter::new();
+    let mut interpreter = Cpu::new();
     let path = Path::new("roms/puzzle.ch8");
     interpreter.load_rom(path)?;
 

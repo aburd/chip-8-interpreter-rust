@@ -16,14 +16,14 @@ pub enum Instruction {
     Assign(u8, u8),    //  8XY0 	Assign 	    Vx=Vy 	Sets VX to the value of VY.
     AssignOr(u8, u8),  //  8XY1 	BitOp 	    Vx=Vx|Vy 	Sets VX to VX or VY. (Bitwise OR operation)
     AssignAnd(u8, u8), //  8XY2 	BitOp 	    Vx=Vx&Vy 	Sets VX to VX and VY. (Bitwise AND operation)
-                       //  8XY3[a]  BitOp 	    Vx=Vx^Vy 	Sets VX to VX xor VY.
-                       //  8XY4 	Math 	    Vx += Vy 	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
-                       //  8XY5 	Math 	    Vx -= Vy 	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
-                       //  8XY6[a]  BitOp 	    Vx>>=1 	Stores the least significant bit of VX in VF and then shifts VX to the right by 1.[b]
-                       //  8XY7[a]	Math 	    Vx=Vy-Vx 	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
-                       //  8XYE[a]	BitOp 	    Vx<<=1 	Stores the most significant bit of VX in VF and then shifts VX to the left by 1.[b]
-                       //  9XY0 	Cond 	    if(Vx!=Vy) 	Skips the next instruction if VX doesn't equal VY. (Usually the next instruction is a jump to skip a code block)
-                       //  ANNN 	MEM 	    I = NNN 	Sets I to the address NNN.
+    AssignXor(u8, u8), //  8XY3[a]  BitOp 	    Vx=Vx^Vy 	Sets VX to VX xor VY.
+    AddCarry(u8, u8),  //  8XY4 	Math 	    Vx += Vy 	Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+    SubLeft(u8, u8),       //  8XY5 	Math 	    Vx -= Vy 	VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+    LeastSig(u8),   //  8XY6[a]  BitOp 	    Vx>>=1 	Stores the least significant bit of VX in VF and then shifts VX to the right by 1.[b]
+    SubRight(u8, u8),      //  8XY7[a]	Math 	    Vx=Vy-Vx 	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+    MostSig(u8),   //  8XYE[a]	BitOp 	    Vx<<=1 	Stores the most significant bit of VX in VF and then shifts VX to the left by 1.[b]
+    CondNeq(u8, u8),   //  9XY0 	Cond 	    if(Vx!=Vy) 	Skips the next instruction if VX doesn't equal VY. (Usually the next instruction is a jump to skip a code block)
+    SetI   //  ANNN 	MEM 	    I = NNN 	Sets I to the address NNN.
                        //  BNNN 	Flow 	    PC=V0+NNN 	Jumps to the address NNN plus V0.
                        //  CXNN 	Rand 	    Vx=rand()&NN 	Sets VX to the result of a bitwise and operation on a random number (Typically: 0 to 255) and NN.
                        //  DXYN 	Disp 	    draw(Vx,Vy,N) 	Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value doesn’t change after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn, and to 0 if that doesn’t happen
@@ -57,39 +57,36 @@ pub enum Instruction {
                        // * - Fx85 - LD Vx, R
 }
 
-fn get_nnn(opcode: Opcode) -> u16 {
-    opcode & 0x0FFF
-}
-fn get_nn(opcode: Opcode) -> u8 {
-    (opcode & 0x00FF) as u8
-}
-fn get_x(opcode: Opcode) -> u8 {
-    ((opcode & 0x0F00) >> 8) as u8
-}
-fn get_y(opcode: Opcode) -> u8 {
-    ((opcode & 0x00F0) >> 4) as u8
-}
-
 pub fn decode_opcode(opcode: Opcode) -> Result<Instruction, String> {
-    match opcode {
-        o if o >= 0x0000 && o < 0x1000 => match o {
-            0x00E0 => Ok(Instruction::Clear),
-            0x00EE => Ok(Instruction::SubReturn),
-            _ => Ok(Instruction::Call(get_nnn(o))),
+    let nibbles = (
+        ((opcode & 0xF000) >> 12) as u8,
+        ((opcode & 0x0F00) >> 8) as u8,
+        ((opcode & 0x00F0) >> 4) as u8,
+        (opcode & 0x000F) as u8,
+    );
+    let nnn = (opcode & 0x0FFF) as u16;
+    let nn = (opcode & 0x00FF) as u8;
+    let x = ((opcode & 0x0F00) >> 8) as u8;
+    let y = ((opcode & 0x00F0) >> 4) as u8;
+
+    match (opcode & 0xF000) >> 12 {
+        0x0 => match nibbles {
+            (_, _, 0xE, 0x0) => Ok(Instruction::Clear),
+            (_, _, 0xE, 0xE) => Ok(Instruction::SubReturn),
+            _ => Ok(Instruction::Call(nnn)),
         },
-        o if o >= 0x1000 && o < 0x2000 => Ok(Instruction::Jump(get_nnn(o))),
-        o if o >= 0x2000 && o < 0x3000 => Ok(Instruction::CallSubroutine(get_nnn(o))),
-        o if o >= 0x3000 && o < 0x4000 => Ok(Instruction::SkipEq(get_x(o), get_nn(o))),
-        o if o >= 0x4000 && o < 0x5000 => Ok(Instruction::SkipNeq(get_x(o), get_nn(o))),
-        o if o >= 0x5000 && o < 0x6000 => Ok(Instruction::SkipRegEq(get_x(o), get_y(o))),
-        o if o >= 0x6000 && o < 0x7000 => Ok(Instruction::Set(get_x(o), get_nn(o))),
-        o if o >= 0x7000 && o < 0x8000 => Ok(Instruction::AddNoCarry(get_x(o), get_nn(o))),
-        o if o >= 0x8000 && o <= 0x9000 => {
-            let trailing_byte = o & 0x000F;
-            match trailing_byte {
-                0x0 => Ok(Instruction::Assign(get_x(o), get_y(o))),
-                0x1 => Ok(Instruction::AssignOr(get_x(o), get_y(o))),
-                0x2 => Ok(Instruction::AssignAnd(get_x(o), get_y(o))),
+        0x1 => Ok(Instruction::Jump(nnn)),
+        0x2 => Ok(Instruction::CallSubroutine(nnn)),
+        0x3 => Ok(Instruction::SkipEq(x, nn)),
+        0x4 => Ok(Instruction::SkipNeq(x, nn)),
+        0x5 => Ok(Instruction::SkipRegEq(x, y)),
+        0x6 => Ok(Instruction::Set(x, nn)),
+        0x7 => Ok(Instruction::AddNoCarry(x, nn)),
+        0x8 => {
+            match nibbles {
+                (_, _, _, 0x0) => Ok(Instruction::Assign(x, y)),
+                (_, _, _, 0x1) => Ok(Instruction::AssignOr(x, y)),
+                (_, _, _, 0x2) => Ok(Instruction::AssignAnd(x, y)),
                 _ => Err("Opcode not implemented!".to_string()),
             }
         }
@@ -173,6 +170,13 @@ fn test_parse_assign_or() {
     let instruction = decode_opcode(opcode);
 
     assert_eq!(instruction, Ok(Instruction::AssignOr(0xA, 0xB)));
+}
+#[test]
+fn test_parse_assign_and() {
+    let opcode: Opcode = 0x8AB2;
+    let instruction = decode_opcode(opcode);
+
+    assert_eq!(instruction, Ok(Instruction::AssignAnd(0xA, 0xB)));
 }
 #[test]
 fn test_parse_assign_and() {
