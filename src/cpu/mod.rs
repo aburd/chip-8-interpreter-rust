@@ -73,7 +73,6 @@ type Gfx = [bool; 64 * 32];
    (0,31)	(63,31)
 */
 
-
 /**
  * =======
  * FONTSET
@@ -201,6 +200,7 @@ impl Cpu {
             Instruction::Assign(x, y) => println!("Assign, x: {:X}, y: {:X}", x, y),
             Instruction::AssignOr(x, y) => println!("AssignOr, x: {:X}, y: {:X}", x, y),
             Instruction::AssignAnd(x, y) => println!("AssignAnd, x: {:X}, y: {:X}", x, y),
+            _ => unimplemented!(),
         }
     }
 

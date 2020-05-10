@@ -1,6 +1,6 @@
+use cpu::Cpu;
 use std::error::Error;
 use std::path::Path;
-use cpu::Cpu;
 
 mod cpu;
 
