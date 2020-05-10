@@ -94,6 +94,8 @@ pub struct Cpu {
     sound_timer: u8,
     delay_timer: u8,
     pub draw_flag: bool,
+    awaiting_keypress: bool,
+    keypress_register: u8,
 }
 
 impl Cpu {
@@ -110,6 +112,8 @@ impl Cpu {
             sound_timer: 0,
             delay_timer: 0,
             draw_flag: false,
+            awaiting_keypress: false,
+            keypress_register: 0,
         }
     }
 
@@ -123,6 +127,7 @@ impl Cpu {
         self.i = 0x0000;
         self.keys = Keys::default();
         self.draw_flag = false;
+        self.keypress_register = 0;
 
         // Reset screen
         self.execute(Instruction::Clear);
@@ -151,15 +156,24 @@ impl Cpu {
 }
 
 impl Cpu {
-    /// Every cycle, the method emulateCycle is called which emulates one cycle of the Chip 8 CPU.
-    /// During this cycle, the emulator will Fetch, Decode and Execute one opcode.
     pub fn emulate_cycle(&mut self) -> Result<(), String> {
-        let opcode = self.fetch_opcode();
+        if self.awaiting_keypress {
+            // block until keyboard is handled
 
-        let instruction = instructions::decode_opcode(opcode)?;
-        self.execute(instruction);
+        } else {
+            // otherwise run CPU as normal
+            let opcode = self.fetch_opcode();
+            let instruction = instructions::decode_opcode(opcode)?;
+            self.execute(instruction);
 
-        // Update timers
+            // Update timers
+            if self.sound_timer > 0 {
+                self.sound_timer -= 1;
+            }
+            if self.delay_timer > 0 {
+                self.delay_timer -= 1;
+            }
+        }
 
         Ok(())
     }
@@ -302,7 +316,8 @@ impl Cpu {
                 ProgramCounterChange::Next
             }
             Instruction::AwaitKeyPress(x) => {
-                println!("AwaitKeyPress, x: {:X}", x);
+                self.awaiting_keypress = true;
+                self.keypress_register = x as u8;
                 ProgramCounterChange::Next
             }
             Instruction::SetDelayTimer(x) => {
