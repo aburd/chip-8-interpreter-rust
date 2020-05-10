@@ -15,8 +15,7 @@ fn main() -> BoxResult<()> {
 
     // Initialize the Chip8 system and load the game into the memory
     let mut cpu = Cpu::new();
-    let rom_path = Path::new(path_str);
-    cpu.load_rom(rom_path)?;
+    cpu.load_rom(path_str)?;
 
     // Emulation loop
     loop {

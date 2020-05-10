@@ -139,8 +139,9 @@ impl Cpu {
         // Reset timers
     }
 
-    pub fn load_rom(&mut self, path: &Path) -> std::io::Result<()> {
-        let file = std::fs::read(path)?;
+    pub fn load_rom(&mut self, path_str: &str) -> std::io::Result<()> {
+        let rom_path = Path::new(path_str);
+        let file = std::fs::read(rom_path)?;
         for (i, byte) in file.iter().enumerate() {
             self.memory[(USERSPACE_START + i as u16) as usize] = *byte;
         }
@@ -173,19 +174,15 @@ impl Cpu {
         if self.pc == USERSPACE_END + 1 {
             self.pc = USERSPACE_START;
         }
-
-        // Decode Opcode
         let instruction = instructions::decode_opcode(opcode)?;
-
-        // Execute Opcode
-        self.execute_instruction(instruction);
+        self.execute(instruction);
 
         // Update timers
 
         Ok(())
     }
 
-    fn execute_instruction(&mut self, instruction: instructions::Instruction) {
+    fn execute(&mut self, instruction: instructions::Instruction) {
         match instruction {
             Instruction::Call(nnn) => println!("Call, nnn: {:X}", nnn),
             Instruction::Clear => println!("Clear screen"),
@@ -261,8 +258,7 @@ fn test_initial_mem_location_is_0x200() {
 #[test]
 fn test_opens_rom_correctly() -> std::io::Result<()> {
     let mut interpreter = Cpu::new();
-    let path = Path::new("roms/puzzle.ch8");
-    interpreter.load_rom(path)?;
+    interpreter.load_rom("roms/puzzle.ch8")?;
 
     let first_byte = interpreter.get_memory(USERSPACE_START as usize);
     assert_eq!(first_byte, 0x00);
