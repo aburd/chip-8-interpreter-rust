@@ -3,10 +3,10 @@ mod instructions;
 
 use instructions::Instruction;
 
-
 /// MEMORY: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
 type Memory = [u8; 4096];
 pub type Opcode = u16;
+const OPCODE_SIZE: u16 = 2;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
 
@@ -17,6 +17,22 @@ type PCRegister = u16; // Program Counter Register
 type SPRegister = u8; // Stack Pointer Register
 type I = u16;
 type Stack = [u16; 16];
+
+enum ProgramCounterChange {
+    Next,
+    Skip,
+    Jump(u16),
+}
+
+impl ProgramCounterChange {
+    fn skip_if(cond: bool) -> Self {
+        if cond {
+            Self::Skip
+        } else {
+            Self::Next
+        }
+    }
+}
 
 fn init_pc_register() -> PCRegister {
     USERSPACE_START.clone()
@@ -34,24 +50,24 @@ type Keys = [bool; 4 * 4];
 
 /// DISPLAY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4
 /*
- *
- * The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
+*
+* The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
 
-   (0,0)	(63,0)
-   (0,31)	(63,31)
+  (0,0)	(63,0)
+  (0,31)	(63,31)
 
- * The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
- * This can easily be implemented using an array that hold the pixel state (1 or 0):
- */
+* The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
+* This can easily be implemented using an array that hold the pixel state (1 or 0):
+*/
 type Gfx = [bool; 64 * 32];
 
 /// SOUND - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.5
 /**
- * The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
+* The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
 
-   (0,0)	(63,0)
-   (0,31)	(63,31)
- */
+  (0,0)	(63,0)
+  (0,31)	(63,31)
+*/
 
 /// FONTSET
 const CHIP8_FONTSET: [u8; 80] = [
@@ -79,6 +95,7 @@ pub struct Cpu {
     pc: PCRegister,
     stack: Stack,
     sp: SPRegister,
+    pixels: Gfx,
     keys: Keys,
     sound_timer: u8,
     delay_timer: u8,
@@ -88,12 +105,14 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Self {
         let memory: Memory = [0; 4096];
+        let pixels: Gfx = [false; 64 * 32];
         Cpu {
             memory,
             v: GeneralRegisters::default(),
             pc: init_pc_register(),
             stack: Stack::default(),
             sp: SPRegister::default(),
+            pixels,
             keys: Keys::default(),
             sound_timer: 0,
             delay_timer: 0,
@@ -163,44 +182,152 @@ impl Cpu {
     }
 
     fn execute(&mut self, instruction: instructions::Instruction) {
-        match instruction {
-            Instruction::Call(nnn) => println!("Call, nnn: {:X}", nnn),
-            Instruction::Clear => println!("Clear screen"),
-            Instruction::SubReturn => println!("SubReturn"),
-            Instruction::Jump(nnn) => println!("Jump, nnn: {:X}", nnn),
-            Instruction::CallSubroutine(nnn) => println!("CallSubroutine, nnn: {:X}", nnn),
-            Instruction::SkipEq(x, nn) => println!("SkipEq, x: {:X}, nn: {:X}", x, nn),
-            Instruction::SkipNeq(x, nn) => println!("SkipNeq, x: {:X}, nn: {:X}", x, nn),
-            Instruction::SkipRegEq(x, y) => println!("SkipRegEq, x: {:X}, y: {:X}", x, y),
-            Instruction::Set(x, nn) => println!("Set, x: {:X}, nn: {:X}", x, nn),
-            Instruction::AddNoCarry(x, nn) => println!("AddNoCarry, x: {:X}, nn: {:X}", x, nn),
-            Instruction::Assign(x, y) => println!("Assign, x: {:X}, y: {:X}", x, y),
-            Instruction::AssignOr(x, y) => println!("AssignOr, x: {:X}, y: {:X}", x, y),
-            Instruction::AssignAnd(x, y) => println!("AssignAnd, x: {:X}, y: {:X}", x, y),
-            Instruction::AssignXor(x, y) => println!("AssignXor, x: {:X}, y: {:X}", x, y),
-            Instruction::AddCarry(x, y) => println!("AddCarry, x: {:X}, y: {:X}", x, y),
-            Instruction::SubLeft(x, y) => println!("SubLeft, x: {:X}, y: {:X}", x, y),
-            Instruction::LeastSig(x) => println!("LeastSig, x: {:X}", x),
-            Instruction::SubRight(x, y) => println!("SubRight, x: {:X}, y: {:X}", x, y),
-            Instruction::MostSig(x) => println!("MostSig, x: {:X}", x),
-            Instruction::CondNeq(x, y) => println!("CondNeq, x: {:X}, y: {:X}", x, y),
-            Instruction::SetI(nnn) => println!("SetI, nnn: {:X}", nnn),
-            Instruction::JumpV0NNN(nnn) => println!("JumpV0NNN, nnn: {:X}", nnn),
-            Instruction::RandX(x, y) => println!("RandX, x: {:X}, y: {:X}", x, y),
-            Instruction::DrawSprite(x, y, n) => {
-                println!("DrawSprite, x: {:X}, y: {:X}, n: {:X}", x, y, n)
+        let pc_change: ProgramCounterChange = match instruction {
+            Instruction::Call(_nnn) => ProgramCounterChange::Next,
+            Instruction::Clear => {
+                // Clears the screen.
+                for pixel in self.pixels.iter_mut() {
+                    *pixel = false;
+                }
+                ProgramCounterChange::Next
             }
-            Instruction::KeyPressed(x) => println!("KeyPressed, x: {:X}", x),
-            Instruction::KeyUnpressed(x) => println!("KeyUnpressed, x: {:X}", x),
-            Instruction::SetXDelayTimer(x) => println!("SetXDelayTimer, x: {:X}", x),
-            Instruction::AwaitKeyPress(x) => println!("AwaitKeyPress, x: {:X}", x),
-            Instruction::SetDelayTimer(x) => println!("SetDelayTimer, x: {:X}", x),
-            Instruction::SetSoundTimer(x) => println!("SetSoundTimer, x: {:X}", x),
-            Instruction::AddVxToI(x) => println!("AddVxToI, x: {:X}", x),
-            Instruction::SetIWithChar(x) => println!("SetIWithChar, x: {:X}", x),
-            Instruction::SetBCD(x) => println!("SetBCD, x: {:X}", x),
-            Instruction::RegDump(x) => println!("RegDump, x: {:X}", x),
-            Instruction::RegLoad(x) => println!("RegLoad, {:X}", x),
+            Instruction::SubReturn => {
+                // The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
+                self.pc = self.stack[self.sp as usize];
+                self.sp -= 1;
+                ProgramCounterChange::Next
+            }
+            Instruction::Jump(nnn) => ProgramCounterChange::Jump(nnn),
+            Instruction::CallSubroutine(nnn) => {
+                println!("CallSubroutine, nnn: {:X}", nnn);
+                ProgramCounterChange::Next
+            }
+            Instruction::SkipEq(x, nn) => {
+                println!("SkipEq, x: {:X}, nn: {:X}", x, nn);
+                ProgramCounterChange::Next
+            }
+            Instruction::SkipNeq(x, nn) => {
+                println!("SkipNeq, x: {:X}, nn: {:X}", x, nn);
+                ProgramCounterChange::Next
+            }
+            Instruction::SkipRegEq(x, y) => {
+                println!("SkipRegEq, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::Set(x, nn) => {
+                println!("Set, x: {:X}, nn: {:X}", x, nn);
+                ProgramCounterChange::Next
+            }
+            Instruction::AddNoCarry(x, nn) => {
+                println!("AddNoCarry, x: {:X}, nn: {:X}", x, nn);
+                ProgramCounterChange::Next
+            }
+            Instruction::Assign(x, y) => {
+                println!("Assign, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::AssignOr(x, y) => {
+                println!("AssignOr, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::AssignAnd(x, y) => {
+                println!("AssignAnd, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::AssignXor(x, y) => {
+                println!("AssignXor, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::AddCarry(x, y) => {
+                println!("AddCarry, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::SubLeft(x, y) => {
+                println!("SubLeft, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::LeastSig(x) => {
+                println!("LeastSig, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SubRight(x, y) => {
+                println!("SubRight, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::MostSig(x) => {
+                println!("MostSig, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::CondNeq(x, y) => {
+                println!("CondNeq, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetI(nnn) => {
+                println!("SetI, nnn: {:X}", nnn);
+                ProgramCounterChange::Next
+            }
+            Instruction::JumpV0NNN(nnn) => {
+                println!("JumpV0NNN, nnn: {:X}", nnn);
+                ProgramCounterChange::Next
+            }
+            Instruction::RandX(x, y) => {
+                println!("RandX, x: {:X}, y: {:X}", x, y);
+                ProgramCounterChange::Next
+            }
+            Instruction::DrawSprite(x, y, n) => {
+                println!("DrawSprite, x: {:X}, y: {:X}, n: {:X}", x, y, n);
+                ProgramCounterChange::Next
+            }
+            Instruction::KeyPressed(x) => {
+                println!("KeyPressed, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::KeyUnpressed(x) => {
+                println!("KeyUnpressed, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetXDelayTimer(x) => {
+                println!("SetXDelayTimer, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::AwaitKeyPress(x) => {
+                println!("AwaitKeyPress, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetDelayTimer(x) => {
+                println!("SetDelayTimer, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetSoundTimer(x) => {
+                println!("SetSoundTimer, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::AddVxToI(x) => {
+                println!("AddVxToI, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetIWithChar(x) => {
+                println!("SetIWithChar, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::SetBCD(x) => {
+                println!("SetBCD, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::RegDump(x) => {
+                println!("RegDump, x: {:X}", x);
+                ProgramCounterChange::Next
+            }
+            Instruction::RegLoad(x) => {
+                println!("RegLoad, {:X}", x);
+                ProgramCounterChange::Next
+            }
+        };
+
+        match pc_change {
+            ProgramCounterChange::Next => self.pc += OPCODE_SIZE,
+            ProgramCounterChange::Skip => self.pc += OPCODE_SIZE * 2,
+            ProgramCounterChange::Jump(nnn) => self.pc = nnn,
         }
     }
 

@@ -4,9 +4,9 @@ use super::Opcode;
 pub enum Instruction {
     // Standard Instructions
     Call(u16), //  0NNN 	Call 		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-    Clear,     //  00E0 	Display 	disp_clear() 	Clears the screen.
+    Clear,     //  00E0
     SubReturn, //  00EE 	Flow 	    return; 	Returns from a subroutine.
-    Jump(u16), //  1NNN 	Flow 	    goto NNN; 	Jumps to address NNN.
+    Jump(u16), //  1NNN
     CallSubroutine(u16), //  2NNN 	Flow 	    *(0xNNN)() 	Calls subroutine at NNN.
     SkipEq(u8, u8), //  3XNN 	Cond 	    if(Vx==NN) 	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
     SkipNeq(u8, u8), //  4XNN 	Cond 	    if(Vx!=NN) 	Skips the next instruction if VX doesn't equal NN. (Usually the next instruction is a jump to skip a code block)
