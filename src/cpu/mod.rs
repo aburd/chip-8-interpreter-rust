@@ -200,7 +200,30 @@ impl Cpu {
             Instruction::Assign(x, y) => println!("Assign, x: {:X}, y: {:X}", x, y),
             Instruction::AssignOr(x, y) => println!("AssignOr, x: {:X}, y: {:X}", x, y),
             Instruction::AssignAnd(x, y) => println!("AssignAnd, x: {:X}, y: {:X}", x, y),
-            _ => unimplemented!(),
+            Instruction::AssignXor(x, y) => println!("AssignXor, x: {:X}, y: {:X}", x, y),
+            Instruction::AddCarry(x, y) => println!("AddCarry, x: {:X}, y: {:X}", x, y),
+            Instruction::SubLeft(x, y) => println!("SubLeft, x: {:X}, y: {:X}", x, y),
+            Instruction::LeastSig(x) => println!("LeastSig, x: {:X}", x),
+            Instruction::SubRight(x, y) => println!("SubRight, x: {:X}, y: {:X}", x, y),
+            Instruction::MostSig(x) => println!("MostSig, x: {:X}", x),
+            Instruction::CondNeq(x, y) => println!("CondNeq, x: {:X}, y: {:X}", x, y),
+            Instruction::SetI(nnn) => println!("SetI, nnn: {:X}", nnn),
+            Instruction::JumpV0NNN(nnn) => println!("JumpV0NNN, nnn: {:X}", nnn),
+            Instruction::RandX(x, y) => println!("RandX, x: {:X}, y: {:X}", x, y),
+            Instruction::DrawSprite(x, y, n) => {
+                println!("DrawSprite, x: {:X}, y: {:X}, n: {:X}", x, y, n)
+            }
+            Instruction::KeyPressed(x) => println!("KeyPressed, x: {:X}", x),
+            Instruction::KeyUnpressed(x) => println!("KeyUnpressed, x: {:X}", x),
+            Instruction::SetXDelayTimer(x) => println!("SetXDelayTimer, x: {:X}", x),
+            Instruction::AwaitKeyPress(x) => println!("AwaitKeyPress, x: {:X}", x),
+            Instruction::SetDelayTimer(x) => println!("SetDelayTimer, x: {:X}", x),
+            Instruction::SetSoundTimer(x) => println!("SetSoundTimer, x: {:X}", x),
+            Instruction::AddVxToI(x) => println!("AddVxToI, x: {:X}", x),
+            Instruction::SetIWithChar(x) => println!("SetIWithChar, x: {:X}", x),
+            Instruction::SetBCD(x) => println!("SetBCD, x: {:X}", x),
+            Instruction::RegDump(x) => println!("RegDump, x: {:X}", x),
+            Instruction::RegLoad(x) => println!("RegLoad, {:X}", x),
         }
     }
 
