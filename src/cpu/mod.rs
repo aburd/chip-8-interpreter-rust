@@ -3,26 +3,15 @@ mod instructions;
 
 use instructions::Instruction;
 
-/**
- * ======
- * MEMORY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
- * ======
- */
+
+/// MEMORY: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.1
 type Memory = [u8; 4096];
 pub type Opcode = u16;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
 
-/**
- * =========
- * REGISTERS - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.2
- * =========
- */
-
-// V0 - VF
+/// REGISTERS - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.2
 const VF: usize = 15;
-// const DELAY_TIMER_REGISTER
-// const SOUND_TIMER_REGISTER
 type GeneralRegisters = [u8; 16];
 type PCRegister = u16; // Program Counter Register
 type SPRegister = u8; // Stack Pointer Register
@@ -33,51 +22,38 @@ fn init_pc_register() -> PCRegister {
     USERSPACE_START.clone()
 }
 
-/**
- * ========
- * KEYBOARD - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.3
- * ========
- *
+/// KEYBOARD - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.3
+/*
  * Layout:
  * 1 2 3 C
  * 4 5 6 D
  * 7 8 9 E
  * A 0 B F
  */
-
 type Keys = [bool; 4 * 4];
 
-/**
-* =======
-* DISPLAY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4
-* =======
-*
-* The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
+/// DISPLAY - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.4
+/*
+ *
+ * The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
 
    (0,0)	(63,0)
    (0,31)	(63,31)
 
-* The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
-* This can easily be implemented using an array that hold the pixel state (1 or 0):
-*/
+ * The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
+ * This can easily be implemented using an array that hold the pixel state (1 or 0):
+ */
 type Gfx = [bool; 64 * 32];
 
+/// SOUND - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.5
 /**
-* ==============
-* TIMERS & SOUND - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.5
-* ==============
-*
-* The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
+ * The original implementation of the Chip-8 language used a 64x32-pixel monochrome display with this format:
 
    (0,0)	(63,0)
    (0,31)	(63,31)
-*/
-
-/**
- * =======
- * FONTSET
- * =======
  */
+
+/// FONTSET
 const CHIP8_FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // ZERO
     0x20, 0x60, 0x20, 0x20, 0x70, // ONE
@@ -104,6 +80,8 @@ pub struct Cpu {
     stack: Stack,
     sp: SPRegister,
     keys: Keys,
+    sound_timer: u8,
+    delay_timer: u8,
     pub draw_flag: bool,
 }
 
@@ -117,6 +95,8 @@ impl Cpu {
             stack: Stack::default(),
             sp: SPRegister::default(),
             keys: Keys::default(),
+            sound_timer: 0,
+            delay_timer: 0,
             draw_flag: false,
         }
     }
