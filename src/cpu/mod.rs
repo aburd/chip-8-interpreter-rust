@@ -92,7 +92,7 @@ pub struct Cpu {
     pc: u16,
     stack: [u16; 16],
     sp: u8,
-    i: I,
+    i: u16,
     pixels: Gfx,
     keys: Keys,
     sound_timer: u8,
@@ -108,7 +108,7 @@ impl Cpu {
             pc: init_pc_register(),
             stack: [0; 16],
             sp: 0x00,
-            i: u16,
+            i: 0x0000,
             pixels: [false; SCREEN_WIDTH * SCREEN_HEIGHT],
             keys: Keys::default(),
             sound_timer: 0,
@@ -124,7 +124,7 @@ impl Cpu {
         self.pc = init_pc_register();
         self.stack = [0; 16];
         self.sp = 0x00;
-        i: 0x0000,
+        self.i = 0x0000;
         self.keys = Keys::default();
         self.draw_flag = false;
 
@@ -285,9 +285,10 @@ impl Cpu {
                 // If this causes any pixels to be erased, VF is set to 1, otherwise it is set to 0. 
                 // If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen. 
                 // See instruction 8xy3 for more information on XOR, and section 2.4, Display, for more information on the Chip-8 screen and sprites.
-                for i in 0..n {
-                    let pixel = self.memory[self.i + i];
-                    self.pixels[(self.v[x] * SCREEN_WIDTH + self.v[y] + i)] = pixel;
+                for i in 0..(n as usize) {
+                    let pixel = self.memory[self.i as usize + i];
+                    let pixel_start = (self.v[x] as usize * SCREEN_WIDTH) + self.v[y] as usize;
+                    self.pixels[pixel_start + i] = pixel != 0;
                 }
                 ProgramCounterChange::Next
             }
