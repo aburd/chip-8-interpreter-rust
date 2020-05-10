@@ -8,6 +8,7 @@ pub type Opcode = u16;
 const OPCODE_SIZE: u16 = 2;
 const USERSPACE_START: u16 = 0x200;
 const USERSPACE_END: u16 = 0xFFF;
+const FONTSET_START: usize = 0x0000;
 
 enum ProgramCounterChange {
     Next,
@@ -128,7 +129,7 @@ impl Cpu {
         self.execute(Instruction::Clear);
 
         // Load fontset
-        for i in 0..80 {
+        for i in FONTSET_START..CHIP8_FONTSET.len() {
             self.memory[i] = CHIP8_FONTSET[i];
         }
 
@@ -285,8 +286,6 @@ impl Cpu {
                     let x = self.v[x] as usize % SCREEN_WIDTH;
                     let y = self.v[y] as usize % SCREEN_HEIGHT;
 
-                    println!("x: {}, y: {}", x, y );
-
                     let pixel = self.memory[self.i as usize + i] != 0;
                     let prev_pixel = self.pixels[y * SCREEN_WIDTH + x];
                     let new_pixel = pixel ^ prev_pixel;
@@ -332,19 +331,25 @@ impl Cpu {
                 ProgramCounterChange::Next
             }
             Instruction::SetIWithChar(x) => {
-                println!("SetIWithChar, x: {:X}", x);
+                self.i = FONTSET_START as u16 + (self.v[x] * 5) as u16;
                 ProgramCounterChange::Next
             }
             Instruction::SetBCD(x) => {
-                println!("SetBCD, x: {:X}", x);
+                self.memory[self.i as usize] = self.v[x] / 100;
+                self.memory[self.i as usize + 1] = (self.v[x] % 100) / 10;
+                self.memory[self.i as usize + 2] = self.v[x] % 10;
                 ProgramCounterChange::Next
             }
             Instruction::RegDump(x) => {
-                println!("RegDump, x: {:X}", x);
+                for i in 0..x {
+                    self.memory[self.i as usize + i] = self.v[i];
+                }
                 ProgramCounterChange::Next
             }
             Instruction::RegLoad(x) => {
-                println!("RegLoad, {:X}", x);
+                for i in 0..x {
+                    self.v[i] = self.memory[self.i as usize + i];
+                }
                 ProgramCounterChange::Next
             }
         };
