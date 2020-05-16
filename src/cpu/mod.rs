@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::path::Path;
+
 mod instructions;
 
 use instructions::Instruction;
@@ -50,8 +51,8 @@ type Keys = [bool; 4 * 4];
 * The graphics of the Chip 8 are black and white and the screen has a total of 2048 pixels (64 x 32).
 * This can easily be implemented using an array that hold the pixel state (1 or 0):
 */
-const SCREEN_WIDTH: usize = 64;
-const SCREEN_HEIGHT: usize = 32;
+pub const SCREEN_WIDTH: usize = 64;
+pub const SCREEN_HEIGHT: usize = 32;
 type Gfx = [bool; SCREEN_WIDTH * SCREEN_HEIGHT];
 
 /// SOUND - http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#2.5
@@ -89,7 +90,7 @@ pub struct Cpu {
     stack: [u16; 16],
     sp: u8,
     i: u16,
-    pixels: Gfx,
+    pub pixels: Gfx,
     keys: Keys,
     sound_timer: u8,
     delay_timer: u8,
@@ -159,8 +160,10 @@ impl Cpu {
     pub fn emulate_cycle(&mut self) -> Result<(), String> {
         if self.awaiting_keypress {
             // block until keyboard is handled
-
         } else {
+            // Handle drawing
+            self.draw_flag = false;
+
             // otherwise run CPU as normal
             let opcode = self.fetch_opcode();
             let instruction = instructions::decode_opcode(opcode)?;
@@ -201,7 +204,7 @@ impl Cpu {
             }
             Instruction::Jump(nnn) => ProgramCounterChange::Jump(nnn),
             Instruction::CallSubroutine(nnn) => {
-                // The interpreter increments the stack pointer, 
+                // The interpreter increments the stack pointer,
                 // then puts the current PC on the top of the stack. The PC is then set to nnn.
                 self.stack[self.sp as usize] = self.pc + OPCODE_SIZE;
                 self.sp += 1;
@@ -281,11 +284,11 @@ impl Cpu {
             }
             Instruction::DrawSprite(x, y, n) => {
                 // Display n-byte sprite starting at memory location I at (Vx, Vy), set 0x0F = collision.
-                // The interpreter reads n bytes from memory, starting at the address stored in I. 
-                // These bytes are then displayed as sprites on screen at coordinates (Vx, Vy). 
-                // Sprites are XORed onto the existing screen. 
-                // If this causes any pixels to be erased, 0x0F is set to 1, otherwise it is set to 0. 
-                // If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen. 
+                // The interpreter reads n bytes from memory, starting at the address stored in I.
+                // These bytes are then displayed as sprites on screen at coordinates (Vx, Vy).
+                // Sprites are XORed onto the existing screen.
+                // If this causes any pixels to be erased, 0x0F is set to 1, otherwise it is set to 0.
+                // If the sprite is positioned so part of it is outside the coordinates of the display, it wraps around to the opposite side of the screen.
                 let mut erased_flag = false;
                 for i in 0..(n as usize) {
                     let x = self.v[x] as usize % SCREEN_WIDTH;
@@ -301,14 +304,15 @@ impl Cpu {
                     }
                 }
                 self.v[0x0F] = if erased_flag { 1 } else { 0 };
+                self.draw_flag = true;
                 ProgramCounterChange::Next
             }
             Instruction::KeyPressed(x) => {
-                println!("KeyPressed, x: {:X}", x);
+                // println!("KeyPressed, x: {:X}", x);
                 ProgramCounterChange::Next
             }
             Instruction::KeyUnpressed(x) => {
-                println!("KeyUnpressed, x: {:X}", x);
+                // println!("KeyUnpressed, x: {:X}", x);
                 ProgramCounterChange::Next
             }
             Instruction::SetXDelayTimer(x) => {
@@ -367,12 +371,8 @@ impl Cpu {
         }
     }
 
-    pub fn draw_graphics(&self) {
-        println!("TODO: Draw graphics");
-    }
-
     pub fn set_keys(&mut self) {
-        println!("TODO: Set keys");
+        // println!("TODO: Set keys");
     }
 }
 

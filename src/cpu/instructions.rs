@@ -9,8 +9,8 @@ pub enum Instruction {
     SkipEq(usize, u8), //  3XNN 	Cond 	    if(Vx==NN) 	Skips the next instruction if VX equals NN. (Usually the next instruction is a jump to skip a code block)
     SkipNeq(usize, u8), //  4XNN 	Cond 	    if(Vx!=NN) 	Skips the next instruction if VX doesn't equal NN. (Usually the next instruction is a jump to skip a code block)
     SkipRegEq(usize, usize), //  5XY0 	Cond 	    if(Vx==Vy) 	Skips the next instruction if VX equals VY. (Usually the next instruction is a jump to skip a code block)
-    Set(usize, u8),       //  6XNN 	Const 	    Vx = NN 	Sets VX to NN.
-    AddNoCarry(usize, u8), //  7XNN 	Const 	    Vx += NN 	Adds NN to VX. (Carry flag is not changed)
+    Set(usize, u8),          //  6XNN 	Const 	    Vx = NN 	Sets VX to NN.
+    AddNoCarry(usize, u8),   //  7XNN 	Const 	    Vx += NN 	Adds NN to VX. (Carry flag is not changed)
     Assign(usize, usize),    //  8XY0 	Assign 	    Vx=Vy 	Sets VX to the value of VY.
     AssignOr(usize, usize),  //  8XY1 	BitOp 	    Vx=Vx|Vy 	Sets VX to VX or VY. (Bitwise OR operation)
     AssignAnd(usize, usize), //  8XY2 	BitOp 	    Vx=Vx&Vy 	Sets VX to VX and VY. (Bitwise AND operation)
@@ -21,8 +21,8 @@ pub enum Instruction {
     SubRight(usize, usize), //  8XY7[a]	Math 	    Vx=Vy-Vx 	Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
     MostSig(usize), //  8XYE[a]	BitOp 	    Vx<<=1 	Stores the most significant bit of VX in VF and then shifts VX to the left by 1.[b]
     CondNeq(usize, usize), //  9XY0 	Cond 	    if(Vx!=Vy) 	Skips the next instruction if VX doesn't equal VY. (Usually the next instruction is a jump to skip a code block)
-    SetI(u16),       //  ANNN 	MEM 	    I = NNN 	Sets I to the address NNN.
-    JumpV0NNN(u16),  //  BNNN 	Flow 	    PC=V0+NNN 	Jumps to the address NNN plus V0.
+    SetI(u16),             //  ANNN 	MEM 	    I = NNN 	Sets I to the address NNN.
+    JumpV0NNN(u16),        //  BNNN 	Flow 	    PC=V0+NNN 	Jumps to the address NNN plus V0.
     RandX(usize, u8), //  CXNN 	Rand 	    Vx=rand()&NN 	Sets VX to the result of a bitwise and operation on a random number (Typically: 0 to 255) and NN.
     DrawSprite(usize, usize, u8), //  DXYN 	Disp 	    draw(Vx,Vy,N) 	Draws a sprite at coordinate (VX, VY) that has a width of 8 pixels and a height of N pixels. Each row of 8 pixels is read as bit-coded starting from memory location I; I value doesn’t change after the execution of this instruction. As described above, VF is set to 1 if any screen pixels are flipped from set to unset when the sprite is drawn, and to 0 if that doesn’t happen
     KeyPressed(usize), //  EX9E 	KeyOp 	    if(key()==Vx) 	Skips the next instruction if the key stored in VX is pressed. (Usually the next instruction is a jump to skip a code block)
@@ -40,23 +40,22 @@ pub enum Instruction {
     //      Stores the binary-coded decimal representation of VX, with the most significant of three digits at the address in I, the middle digit at I plus 1, and the least significant digit at I plus 2. (In other words, take the decimal representation of VX, place the hundreds digit in memory at location in I, the tens digit at location I+1, and the ones digit at location I+2.)
     RegDump(usize), //  FX55 	MEM 	    reg_dump(Vx,&I) 	Stores V0 to VX (including VX) in memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.[d]
     RegLoad(usize), //  FX65 	MEM 	    reg_load(Vx,&I) 	Fills V0 to VX (including VX) with values from memory starting at address I. The offset from I is increased by 1 for each value written, but I itself is left unmodified.[d]
-                 // * =========================
-                 // * Super Chip-48 Instructions
-                 // * ==========================
-                 // * - 00Cn - SCD nibble
-                 // * - 00FB - SCR
-                 // * - 00FC - SCL
-                 // * - 00FD - EXIT
-                 // * - 00FE - LOW
-                 // * - 00FF - HIGH
-                 // * - Dxy0 - DRW Vx, Vy, 0
-                 // * - Fx30 - LD HF, Vx
-                 // * - Fx75 - LD R, Vx
-                 // * - Fx85 - LD Vx, R
+                    // * =========================
+                    // * Super Chip-48 Instructions
+                    // * ==========================
+                    // * - 00Cn - SCD nibble
+                    // * - 00FB - SCR
+                    // * - 00FC - SCL
+                    // * - 00FD - EXIT
+                    // * - 00FE - LOW
+                    // * - 00FF - HIGH
+                    // * - Dxy0 - DRW Vx, Vy, 0
+                    // * - Fx30 - LD HF, Vx
+                    // * - Fx75 - LD R, Vx
+                    // * - Fx85 - LD Vx, R
 }
 
 pub fn decode_opcode(opcode: u16) -> Result<Instruction, String> {
-    println!("OPCODE: 0x{:X}", opcode);
     let nibbles = (
         ((opcode & 0xF000) >> 12) as u8,
         ((opcode & 0x0F00) >> 8) as u8,

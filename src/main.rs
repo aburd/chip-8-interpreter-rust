@@ -1,8 +1,9 @@
-use cpu::Cpu;
+use cpu::{Cpu, SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::error::Error;
 use std::path::Path;
 
 mod cpu;
+mod display;
 
 type BoxResult<T> = Result<T, Box<dyn Error>>;
 
@@ -27,7 +28,7 @@ fn main() -> BoxResult<()> {
 
         // If the draw flag is set, update the screen
         if cpu.draw_flag {
-            cpu.draw_graphics();
+            display::draw_pixels(&cpu.pixels, SCREEN_WIDTH, SCREEN_HEIGHT);
         }
 
         // Store key press state (Press and Release)
